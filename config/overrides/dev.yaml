@@ -2,7 +2,7 @@ project:
   env: "dev"
 
 paths:
-  root: "d:/DS_project/telco-churn-project"
+  root: "d:/DS_project/ml-framework-telco"
 
 pipeline:
   orchestrator:
