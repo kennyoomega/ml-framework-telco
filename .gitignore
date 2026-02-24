@@ -1,0 +1,37 @@
+# Claude
+.claude/
+
+# Data
+data/raw/
+data/interim/
+data/processed/
+*.parquet
+
+# Artifacts (generated)
+artifacts/
+
+# Figures (generated)
+figures/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment
+.env
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

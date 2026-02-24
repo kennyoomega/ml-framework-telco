@@ -1,0 +1,25 @@
+project:
+  env: "dev"
+
+paths:
+  root: "d:/DS_project/telco-churn-project"
+
+pipeline:
+  orchestrator:
+    stages:
+      data_quality:
+        steps: []
+        # Example (DEV ONLY):
+        # Override step-level execution for debugging or partial runs.
+        # This does NOT change module code behavior — it only tells the orchestrator
+        # whether a step should be executed in this environment.
+        #
+        # Typical use cases:
+        # - Disable a slow or noisy step during local iteration
+        # - Temporarily isolate a failing module
+        # - Speed up experiments while keeping prod config unchanged
+        #
+        # Note:
+        # - The step is still fully defined in base.yaml
+        # - Gate logic (hard / soft) remains unchanged
+        # - Prod should never rely on overrides like this

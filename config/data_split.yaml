@@ -1,0 +1,34 @@
+pipeline:
+  split_strategy:
+    split:
+      type: "holdout"           # "holdout" | "cv"
+      strategy: "stratified"    # "random" | "stratified" | "group" | "time_based"
+      test_size: 0.20           # 20% → test  (60/20/20 overall split)
+      val_size: 0.20            # 20% → val   (engine computes val_size_of_trainval = val_size / (1 - test_size))
+      random_state: 42
+      group_col: null           # required if strategy="group"
+      timestamp_col: null       # required if strategy="time_based"
+
+    constraints:
+      enforce_time_split_if_timestamp: true    # recommend time_based if Step 3 detected active timestamp
+      enforce_group_split_if_entity: true      # recommend group split if Step 3 detected entity structure
+      step3_leakage_artifact_name: "leakage_scan"
+      step3_temporal_artifact_name: "temporal"
+      max_examples: 10
+
+    diagnostics:
+      max_group_overlap: 0                     # hard: any group overlap = fail
+      max_time_inversion: 0                    # hard: any time inversion = fail
+      max_label_imbalance_pct: 0.10            # ±10% from overall positive rate → warn
+      drift:
+        method: "ks"                           # Kolmogorov-Smirnov test (scipy.stats.ks_2samp)
+        top_k: 5                               # report top-k features by KS statistic
+        ks_warn_threshold: 0.10               # KS statistic > threshold → warn
+        p_value_threshold: 0.05               # p-value < threshold → flag
+      min_train_size: 500
+      min_val_size: 100
+      min_test_size: 100
+
+    summary:
+      max_examples: 20
+      warn_on_missing_reports: true

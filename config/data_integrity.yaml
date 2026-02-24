@@ -1,0 +1,74 @@
+pipeline:
+  data_integrity:
+    row_identity:
+      label_conflict_check: true
+      max_duplicate_examples: 20
+
+    temporal:
+      timestamp_col: null
+      entity_id_columns: []
+      allow_missing_timestamps: false
+      min_allowed_timestamp: null
+      max_allowed_timestamp: null
+      max_duplicate_examples: 20
+      max_out_of_order_examples: 20
+      out_of_order_definition: "original_order"
+
+    label_alignment:
+      min_positive_share: 0.01
+      max_positive_share: 0.99
+      forbidden_name_substrings:
+        - "label"
+        - "target"
+        - "churn"
+        - "default"
+        - "fraud"
+        - "converted"
+      sample_size_for_equality: 1000
+      max_examples: 20
+      min_non_missing_for_equality: 50
+
+    leakage_scan:
+      high_risk_name_substrings:
+        - "churn"
+        - "default"
+        - "fraud"
+        - "converted"
+        - "outcome"
+        - "result"
+        - "label"
+        - "target"
+        - "response"
+        - "next_"
+        - "future"
+        - "after_"
+        - "post_"
+      id_like_name_substrings:
+        - "id"
+        - "uuid"
+        - "guid"
+        - "hash"
+        - "account"
+        - "customer"
+        - "user"
+      high_cardinality_threshold: 0.90
+      corr_threshold: 0.98
+      max_examples: 30
+
+      derived_proxies:
+        enabled: true
+        min_non_missing: 200
+        max_examples: 10
+        rules:
+          - target: "TotalCharges"
+            components: ["MonthlyCharges", "tenure"]
+            op: "product"
+            ratio_band: [0.8, 1.2]
+            min_in_band_share: 0.90
+
+    summary:
+      max_examples: 20
+      warn_on_missing_reports: true
+      fail_on_missing_reports: true
+      warn_on_high_risk_leakage: true
+      max_event_hints: 200

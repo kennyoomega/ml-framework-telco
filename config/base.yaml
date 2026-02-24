@@ -1,0 +1,260 @@
+version: 1
+
+project:
+  name: "telco-churn-project"
+  timezone: "Europe/Copenhagen"
+  seed: 42
+
+paths:
+  root: null   # set in overrides/dev.yaml or overrides/prod.yaml
+  data:
+    raw: "data/raw"
+    interim: "data/interim"
+    processed: "data/processed"
+  outputs:
+    models: "models"
+    figures: "figures"
+    artifacts: "artifacts"
+
+dataset:
+  name: "Telco-Customer-Churn"
+  file:
+    format: "csv"
+    extension: ".csv"
+  keys:
+    primary: ["customerID"]
+  label:
+    col: "Churn"
+    positive: "Yes"
+    task_type: "classification"
+  schema:
+    required_columns:
+      - customerID
+      - gender
+      - SeniorCitizen
+      - Partner
+      - Dependents
+      - tenure
+      - PhoneService
+      - MultipleLines
+      - InternetService
+      - OnlineSecurity
+      - OnlineBackup
+      - DeviceProtection
+      - TechSupport
+      - StreamingTV
+      - StreamingMovies
+      - Contract
+      - PaperlessBilling
+      - PaymentMethod
+      - MonthlyCharges
+      - TotalCharges
+      - Churn
+    dtypes:
+      numeric:
+        - SeniorCitizen
+        - tenure
+        - MonthlyCharges
+        - TotalCharges
+      categorical:
+        - gender
+        - Partner
+        - Dependents
+        - PhoneService
+        - MultipleLines
+        - InternetService
+        - OnlineSecurity
+        - OnlineBackup
+        - DeviceProtection
+        - TechSupport
+        - StreamingTV
+        - StreamingMovies
+        - Contract
+        - PaperlessBilling
+        - PaymentMethod
+    allow_extra_columns: true
+
+artifacts:
+  naming:
+    pattern: "{stage}_{name}_{run_id}.json"
+    allowed_stages: ["setup", "data_quality", "data_integrity", "split_strategy", "governance"]
+  limits:
+    include_suffixes: [".json"]
+    max_artifacts: 5000
+
+pipeline:
+  enabled: true
+  mode: "full"
+  plan:
+    - "data_quality"
+    - "data_integrity"
+    - "split_strategy"
+    - "governance"
+
+  gate_policy:
+    strict: true
+    default: "soft"
+
+  reporting:
+    schema_version: 1
+    status_values: ["pass", "warn", "fail", "skipped"]
+    required_top_keys:
+      - schema_version
+      - run_id
+      - timestamp_utc
+      - module
+      - summary
+      - status
+      - inputs
+      - thresholds_used
+      - used_config
+      - refs
+      - checks
+    module:
+      required_keys:
+        - stage
+        - step
+        - name
+        - tag
+        - cfg_key
+        - enabled
+    summary:
+      required_keys:
+        - total_rows
+        - total_cols
+        - overall_status
+        - issues
+        - warnings
+        - metrics
+        - notes
+    include:
+      inputs_block: true
+    limits:
+      max_preview_rows: 3
+      max_preview_cols: 5
+      max_examples: 30
+
+  orchestrator:
+    stages:
+      data_quality:
+        enabled: true
+        groups:
+          ingestion:
+            enabled: true
+            steps:
+              - id: "ingestion"
+                cfg_key: "pipeline.data_quality.ingestion"
+                gate: "hard"
+                enabled: true
+
+          diagnostics:
+            enabled: true
+            steps:
+              - id: "contract"
+                cfg_key: "pipeline.data_quality.contract"
+                gate: "hard"
+                enabled: true
+              - id: "health"
+                cfg_key: "pipeline.data_quality.health"
+                gate: "soft"
+                enabled: true
+              - id: "semantic"
+                cfg_key: "pipeline.data_quality.semantic"
+                gate: "soft"
+                enabled: true
+              - id: "readiness"
+                cfg_key: "pipeline.data_quality.readiness"
+                gate: "hard"
+                enabled: true
+              - id: "domain_core"
+                cfg_key: "pipeline.data_quality.domain_diagnostics.core"
+                gate: "soft"
+                enabled: true
+              - id: "domain_addon_telco"
+                cfg_key: "pipeline.data_quality.domain_diagnostics.telco_churn"
+                gate: "soft"
+                enabled: true
+              - id: "distribution"
+                cfg_key: "pipeline.data_quality.distribution"
+                gate: "soft"
+                enabled: true
+              - id: "summary"
+                cfg_key: "pipeline.data_quality.summary"
+                gate: "soft"
+                enabled: true
+
+          cleaning:
+            enabled: true
+            steps:
+              - id: "cleaning"
+                cfg_key: "pipeline.data_quality.cleaning"
+                gate: "hard"
+                enabled: true
+
+      data_integrity:
+        enabled: true
+        steps:
+          - id: "row_identity"
+            cfg_key: "pipeline.data_integrity.row_identity"
+            gate: "hard"
+            enabled: true
+          - id: "temporal"
+            cfg_key: "pipeline.data_integrity.temporal"
+            gate: "hard"
+            enabled: true
+          - id: "label_alignment"
+            cfg_key: "pipeline.data_integrity.label_alignment"
+            gate: "hard"
+            enabled: true
+          - id: "leakage_scan"
+            cfg_key: "pipeline.data_integrity.leakage_scan"
+            gate: "soft"
+            enabled: true
+          - id: "summary"
+            cfg_key: "pipeline.data_integrity.summary"
+            gate: "hard"
+            enabled: true
+
+      split_strategy:
+        enabled: true
+        steps:
+          - id: "split_plan"
+            cfg_key: "pipeline.split_strategy.split"
+            gate: "hard"
+            enabled: true
+          - id: "leakage_constraints"
+            cfg_key: "pipeline.split_strategy.constraints"
+            gate: "soft"
+            enabled: true
+          - id: "split_builder"
+            cfg_key: "pipeline.split_strategy.split"
+            gate: "hard"
+            enabled: true
+          - id: "split_diagnostics"
+            cfg_key: "pipeline.split_strategy.diagnostics"
+            gate: "soft"
+            enabled: true
+          - id: "split_summary"
+            cfg_key: "pipeline.split_strategy.summary"
+            gate: "soft"
+            enabled: true
+
+      governance:
+        enabled: true
+        steps:
+          - id: "manifest"
+            cfg_key: "pipeline.governance.manifest"
+            gate: "soft"
+            enabled: true
+          - id: "lineage_audit"
+            cfg_key: "pipeline.governance.lineage_audit"
+            gate: "soft"
+            enabled: true
+          - id: "inventory"
+            cfg_key: "pipeline.governance.inventory"
+            gate: "soft"
+            enabled: true
+          - id: "release_gate"
+            cfg_key: "pipeline.governance.release_gate"
+            gate: "soft"
+            enabled: true

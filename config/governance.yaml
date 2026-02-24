@@ -1,0 +1,143 @@
+pipeline:
+  governance:
+    # =========================
+    # 11.1 Run Manifest & Snapshot
+    # =========================
+    manifest:
+      # --- Canonical scan behavior (bounded + configurable) ---
+      scan:
+        include_suffixes: [".json"]
+        max_artifacts: 200
+        filter_by_run_id: true
+        recursive: false
+        sort_by: "name"          # name | mtime
+        include_hash_preview: true
+        hash_algo: "sha256"      # sha256 | md5 (sha256 recommended)
+        hash_block_size: 65536
+
+      # --- Keep report size stable (11.1 preview only) ---
+      preview:
+        max_items: 30
+
+      # --- Reproducibility anchors / refs ---
+      refs:
+        include_setup_config_snapshot: true
+        require_setup_config_snapshot: false
+        setup_config_snapshot:
+          stage: "setup"
+          name: "config_snapshot"
+
+      # --- Dataset fingerprint config (lightweight, stable) ---
+      fingerprint:
+        sample_columns: 5
+        include_columns_hash: true
+        include_shape: true
+        include_dtypes: true
+        include_null_rate: false
+
+    # =========================
+    # 11.2 Lineage & Consistency Audit
+    # =========================
+    lineage_audit:
+
+      anchors:
+        require_setup_config_snapshot: false
+        require_data_quality_orchestrator: true
+        require_data_integrity_orchestrator: true
+
+        setup_config_snapshot:
+          stage: "setup"
+          name: "config_snapshot"
+
+        data_quality_orchestrator:
+          stage: "data_quality"
+          name: "orchestrator"
+
+        data_integrity_orchestrator:
+          stage: "data_integrity"
+          name: "orchestrator"
+
+        governance_manifest:
+          stage: "governance"
+          name: "manifest"
+
+      rules:
+        run_id_consistency: true
+        schema_version_consistency: true
+
+        cleaned_dataset_exists_check:
+          enabled: true
+          evidence_paths:
+            - "checks.persistence.cleaned_parquet_path"
+            - "refs.outputs.cleaned_path"
+          required: false
+          must_exist_on_disk: true
+
+      limits:
+        max_missing_refs_examples: 20
+
+    # =========================
+    # 11.3 Artifact Inventory Index
+    # =========================
+    inventory:
+
+      scan:
+        include_suffixes: [".json"]
+        max_artifacts: 2000
+        filter_by_run_id: false
+        recursive: false
+        sort_by: "mtime"
+        include_hash: false
+
+      paging:
+        enabled: true
+        page_size: 200
+        max_pages: 5
+
+      output:
+        index_version: 1
+        include_step_hint: true
+        include_size_bytes: true
+        include_modified_at_utc: true
+
+    # =========================
+    # 11.4 Release Decision & Policy Gate
+    # =========================
+    release_gate:
+      allow_warn: true
+      allow_skipped: true
+
+      policy:
+        required_reports:
+          - stage: "setup"
+            name: "config_snapshot"
+            allowed_status: ["pass", "warn"]
+
+          - stage: "data_quality"
+            name: "orchestrator"
+            allowed_status: ["pass", "warn"]
+
+          - stage: "data_integrity"
+            name: "orchestrator"
+            allowed_status: ["pass", "warn"]
+
+          - stage: "governance"
+            name: "manifest"
+            allowed_status: ["pass", "warn"]
+
+        conditional_required_steps:
+          enabled: true
+          enforce_enabled_steps_presence: true
+          allowed_status: ["pass", "warn", "skipped"]
+
+        blocking:
+          block_on_fail: true
+          block_on_event_hints:
+            enabled: true
+            severity_signals_blocking: ["hard"]
+
+      outputs:
+        include_releasable_flag: true
+        include_reasons: true
+        include_remediation: true
+

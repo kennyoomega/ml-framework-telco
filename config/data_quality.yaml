@@ -1,0 +1,156 @@
+pipeline:
+  data_quality:
+    ingestion:
+      # Supported: "csv" | "db"
+      # In dev override, keep "csv".
+      source: "csv"
+
+      # --- CSV settings (v1 default) ---
+      csv:
+        file_glob: "*.csv"
+        encoding: "utf-8"
+
+      # --- DB settings (v2+ entrypoint; CSV-only implementation can stub this) ---
+      # Policy is FIXED:
+      #   - Connection secrets and endpoints MUST come from env
+      #   - YAML only stores non-secret metadata like driver/schema/table/query
+      db:
+        enabled: false
+        driver: "postgresql"     # non-secret
+        schema: "public"         # non-secret
+        table: null              # set in prod override if needed
+        query: null              # optional; prefer query over table when provided
+
+        # Env var names (SSOT) - code reads these, not raw values in YAML.
+        env:
+          host: "TELCO_DB_HOST"
+          port: "TELCO_DB_PORT"
+          database: "TELCO_DB_NAME"
+          user: "TELCO_DB_USER"
+          password: "TELCO_DB_PASSWORD"
+          sslmode: "TELCO_DB_SSLMODE"          # optional
+          connect_timeout: "TELCO_DB_TIMEOUT"  # optional
+
+    contract:
+      use_dataset_schema: true
+      enforce_required_columns: true
+      enforce_dtypes: false
+
+    health:
+      high_missing_threshold: 0.20
+      high_cardinality_ratio: 0.50
+      top_k: 3
+      plots:
+        enabled: true
+        top_n : 10
+
+    semantic:
+      max_examples: 5
+      ruleset: "telco_v1"
+
+    readiness:
+      min_rows: 1000
+      max_label_missing_pct: 0.30
+      min_positive_frac: 0.05
+      max_positive_frac: 0.95
+
+    domain_diagnostics:
+      core:
+        segment_cols:
+          - gender
+          - SeniorCitizen
+          - Partner
+          - Dependents
+          - Contract
+          - PaymentMethod
+        rare_segment_min_share: 0.01
+        categorical_top_k: 10
+        leakage:
+          candidates: []
+          correlation_threshold: 0.90
+          min_non_missing: 10
+
+      telco_churn:
+        segment_cols:
+          - Contract
+          - PaperlessBilling
+          - PaymentMethod
+          - InternetService
+          - MultipleLines
+          - OnlineSecurity
+          - PhoneService
+          - StreamingMovies
+          - StreamingTV
+          - TechSupport
+          - Dependents
+          - Partner
+          - SeniorCitizen
+        tenure_bins: [0, 6, 12, 24, 48, 1000]
+        tenure_bin_labels: ["0-6m", "6-12m", "12-24m", "24-48m", "48m+"]
+        monthly_charge_quantiles: [0.0, 0.33, 0.66, 1.0]
+        rare_segment_min_share: 0.01
+        leakage:
+          candidates: ["TotalCharges"]
+          ratio_band: [0.8, 1.2]
+          correlation_threshold: 0.70
+          actions:
+            TotalCharges:
+              - check_multicollinearity
+              - drop_or_regularize
+              - keep_but_constrain
+        plots:
+          enabled: true
+          bins: 30
+
+    distribution:
+      max_majority_share: 0.80
+      min_segment_share: 0.01
+      plots:
+        enabled: true
+        top_n: 10
+
+    summary:
+      max_examples: 20
+      top_k_numeric: 5
+      top_k_categorical: 3
+
+    cleaning:
+      string_columns: null
+      include_mapping_in_report: false
+      output_filename_prefix: "telco_cleaned"
+      enable_normalize_strings: true
+
+      numeric_cast_columns:
+        TotalCharges:
+          type: float
+          errors: "coerce"
+
+      rare_category:
+        min_freq: 30
+        other_label: "Other"
+        columns:
+          - PaymentMethod
+          - InternetService
+          - OnlineSecurity
+          - OnlineBackup
+          - DeviceProtection
+          - TechSupport
+          - StreamingTV
+          - StreamingMovies
+
+      value_mappings:
+        service_flags:
+          columns:
+            - OnlineSecurity
+            - OnlineBackup
+            - DeviceProtection
+            - TechSupport
+            - StreamingTV
+            - StreamingMovies
+            - MultipleLines
+          mapping:
+            "No internet service": "No"
+            "No phone service": "No"
+
+      hooks:
+        telco_total_charges_imputation: true
