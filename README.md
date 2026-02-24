@@ -3,6 +3,17 @@
 
 > **Status:** DE Layer complete (Steps 1–3, 11) · MLE Layer in progress (Steps 4–6) · DS Layer upcoming (Steps 7–10)
 
+## TL;DR
+
+- **Goal:** a reproducible, evidence-first DE foundation for ML pipelines (Steps **1–3, 11**)
+- **Key ideas:** **YAML SSOT** · **ModuleReport v1 artifacts** · **hard/soft gates** · **release gate**
+- **What you get:** a deterministic **`releasable: true/false`** run decision + reasons/remediation
+
+**Example output (Step 11):**
+```txt
+releasable: True | reasons: [] | 22 artifacts indexed | all run_ids consistent
+```
+
 ---
 
 ## What This Is
@@ -30,7 +41,7 @@ TotalCharges ≈ MonthlyCharges × tenure
 
 **99.2% of TotalCharges values fall within a [0.8, 1.2] ratio band** of that product. The feature is a derived proxy — not an independent signal. Including all three in a model inflates feature importance and hides the actual drivers of churn.
 
-The pipeline caught it. No manual EDA. No domain guesswork.
+The pipeline flagged this pattern automatically and persisted the evidence in artifacts, making the finding reproducible and auditable.
 
 Final governance output:
 ```
@@ -61,13 +72,17 @@ DS Layer  ───────────────────────�
   Step 12  Next Steps / Future Work
 ```
 
-Steps 1–3 and 11 are **problem-type agnostic** — they run identically for classification, regression, time series, and A/B testing. Only Steps 4–10 swap task-specific components.
+Steps 1–3 and 11 define a reusable foundation (SSOT config, artifacts, gates, governance).
+Some checks are domain- or task-dependent and can be enabled/disabled via YAML.
+Steps 4–10 are task-specific components.
 
 ---
 
 ## DE Layer — Module Map
 
-### Step 1 · Setup & Environment
+<details>
+<summary><b>Step 1 · Setup & Environment</b></summary>
+
 | What | How |
 |---|---|
 | Multi-YAML deep merge | `base.yaml` → layer configs → env overrides. Later files win. |
@@ -75,7 +90,11 @@ Steps 1–3 and 11 are **problem-type agnostic** — they run identically for cl
 | Reproducibility | Seeds Python, NumPy, and hash RNG from YAML. |
 | Config snapshot | Persists the full merged config as a JSON artifact — Step 11 uses it for lineage. |
 
-### Step 2 · Data Quality (10 modules)
+</details>
+
+<details>
+<summary><b>Step 2 · Data Quality (10 modules)</b></summary>
+
 | Module | What it does |
 |---|---|
 | 2.1 Ingestion | CSV / DB loading via YAML SSOT. DB secrets via env only — never in config. |
@@ -90,7 +109,11 @@ Steps 1–3 and 11 are **problem-type agnostic** — they run identically for cl
 | 2.9 Cleaning | Telco-specific hooks on generic engine: TotalCharges imputation via `MonthlyCharges × tenure`, string normalisation, dtype casting, rare-category bucketing. Outputs cleaned `.parquet`. |
 | 2.x Orchestrator | SSOT-driven controller: ingestion → diagnostics → cleaning. Prerequisite enforcement. Gate policy. |
 
-### Step 3 · Data Integrity & Anti-Leakage (5 modules)
+</details>
+
+<details>
+<summary><b>Step 3 · Data Integrity & Anti-Leakage (5 modules)</b></summary>
+
 | Module | What it does |
 |---|---|
 | 3.1 Row Identity | PK uniqueness + label conflict check per entity. Detects same entity with conflicting labels. |
@@ -100,7 +123,11 @@ Steps 1–3 and 11 are **problem-type agnostic** — they run identically for cl
 | 3.5 Integrity Summary | Aggregates 3.1–3.4. Emits `ready_for_step4` flag. |
 | 3.x Orchestrator | Loads cleaned parquet from Step 2 artifact (lineage-traced, not passed directly). |
 
-### Step 11 · Governance — Control Plane (4 modules)
+</details>
+
+<details>
+<summary><b>Step 11 · Governance — Control Plane (4 modules)</b></summary>
+
 | Module | What it does |
 |---|---|
 | 11.1 Run Manifest | Dataset fingerprint (SHA256 column hash), artifact directory scan, clean dataset reference. Single source of truth for 11.2–11.4. |
@@ -108,6 +135,8 @@ Steps 1–3 and 11 are **problem-type agnostic** — they run identically for cl
 | 11.3 Artifact Inventory | Paged, mtime-sorted artifact browser. Lightweight — no hashing (done in 11.1). |
 | 11.4 Release Gate | Three-layer policy check: required report statuses → enabled step coverage → hard-severity event hints. Outputs `releasable: true/false` with reasons and remediation. |
 | 11.x Orchestrator | 11.1 → 11.2 → 11.3 → 11.4. 11.2 reuses 11.1's in-memory report. Overall status inherits 11.4. |
+
+</details>
 
 ---
 
@@ -189,7 +218,8 @@ Severity signals: `hard` · `fixable` · `risk` · `info`
 The release gate scans every upstream report for `hard` hints and blocks the run — regardless of `overall_status`.
 
 ### Fail-Safe Execution
-If a module crashes, the orchestrator builds an exception report, persists a safety-net artifact, and continues. The pipeline always produces a complete audit trail — even in partial failure.
+If a module crashes, the orchestrator persists an exception artifact and records the failure in the run log.
+Under strict governance policy, such failures will **block release** in Step 11 — ensuring we never ship an untrustworthy run.
 
 ### Prerequisite Enforcement
 ```
@@ -252,6 +282,11 @@ paths:
 ```
 
 Open `notebooks/Churn.ipynb` and run all cells. The orchestrators handle the rest.
+
+After running the notebook, you should see:
+- `artifacts/` populated with `data_quality_*`, `data_integrity_*`, and `governance_*` ModuleReport artifacts
+- a final governance summary with `releasable: true/false` and reasons/remediation
+- a cleaned dataset reference in the Step 2.9 artifact (output `.parquet` path)
 
 ---
 
