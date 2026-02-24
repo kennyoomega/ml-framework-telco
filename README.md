@@ -279,6 +279,6 @@ Python 3.10+
 
 **Siyu Chen**
 Data Engineering · ML Engineering · Data Science
-Copenhagen, Denmark · Open to relocation (Denmark / Netherlands)
+Copenhagen, Denmark · Open to relocation (Denmark / Netherlands / Germany)
 
-[LinkedIn](https://linkedin.com/in/yourprofile) · [GitHub](https://github.com/kennyoomega)
+[LinkedIn](https://www.linkedin.com/in/siyu-chen-861750318) · [GitHub](https://github.com/kennyoomega)
